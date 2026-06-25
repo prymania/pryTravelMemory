@@ -1,7 +1,7 @@
 {
   "rewrites": [
     { "source": "/api/v1/:path*", "destination": "/api/index" },
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+    { "source": "/(.*)",          "destination": "/index.html" }
   ],
   "buildCommand": "npm --prefix frontend install && npm --prefix frontend run build",
   "outputDirectory": "frontend/dist",
