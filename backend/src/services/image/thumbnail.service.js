@@ -1,30 +1,35 @@
 const sharp = require('sharp');
 const path = require('path');
+const storage = require('../storage/storage.service');
 
 async function generate(sourcePath, filename) {
   const basename = path.basename(filename, path.extname(filename));
-  const dir = path.dirname(sourcePath);
 
-  const thumbFile  = `${basename}_thumb.webp`;
-  const mediumFile = `${basename}_med.webp`;
+  const thumbPath = `photos/${basename}_thumb.webp`;
+  const medPath   = `photos/${basename}_med.webp`;
 
   const meta = await sharp(sourcePath).metadata();
 
-  await Promise.all([
+  const [thumbBuf, medBuf] = await Promise.all([
     sharp(sourcePath)
       .resize(400, 400, { fit: 'cover', position: 'attention' })
       .webp({ quality: 80 })
-      .toFile(path.join(dir, thumbFile)),
+      .toBuffer(),
 
     sharp(sourcePath)
       .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
       .webp({ quality: 85 })
-      .toFile(path.join(dir, mediumFile)),
+      .toBuffer(),
+  ]);
+
+  const [thumbnailKey, mediumKey] = await Promise.all([
+    storage.upload(thumbBuf, thumbPath, 'image/webp'),
+    storage.upload(medBuf,   medPath,   'image/webp'),
   ]);
 
   return {
-    thumbnailKey: `photos/${thumbFile}`,
-    mediumKey:    `photos/${mediumFile}`,
+    thumbnailKey,
+    mediumKey,
     width:  meta.width  || 0,
     height: meta.height || 0,
   };

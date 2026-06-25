@@ -1,7 +1,7 @@
 const multer = require('multer');
 const path = require('path');
+const os = require('os');
 const { v4: uuidv4 } = require('uuid');
-const fs = require('fs');
 
 const ALLOWED_TYPES = [
   'image/jpeg', 'image/jpg', 'image/png', 'image/webp',
@@ -9,27 +9,20 @@ const ALLOWED_TYPES = [
 ];
 const MAX_SIZE = 50 * 1024 * 1024; // 50MB
 
-function ensureDir(dir) {
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  return dir;
-}
-
+// Always write to OS temp dir first — storage service handles final destination
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = ensureDir(path.join(process.env.UPLOADS_DIR || './uploads', 'photos'));
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
+  destination: (_req, _file, cb) => cb(null, os.tmpdir()),
+  filename:    (_req,  file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
     cb(null, `${uuidv4()}${ext}`);
   },
 });
 
-const fileFilter = (req, file, cb) => {
+const fileFilter = (_req, file, cb) => {
   if (ALLOWED_TYPES.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error(`File type not supported. Allowed: JPG, PNG, WEBP, HEIC`));
+    cb(new Error('File type not supported. Allowed: JPG, PNG, WEBP, HEIC'));
   }
 };
 

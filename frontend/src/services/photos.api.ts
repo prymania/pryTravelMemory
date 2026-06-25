@@ -5,6 +5,7 @@ const BASE = import.meta.env.VITE_API_URL?.replace('/api/v1', '') || 'http://loc
 
 export function photoUrl(key?: string | null): string {
   if (!key) return ''
+  if (key.startsWith('http://') || key.startsWith('https://')) return key
   return `${BASE}/uploads/${key}`
 }
 

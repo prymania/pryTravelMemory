@@ -1,6 +1,8 @@
+const fs = require('fs').promises;
 const photoModel = require('../models/photo.model');
 const exifService = require('../services/exif/exif.service');
 const thumbnailService = require('../services/image/thumbnail.service');
+const storage = require('../services/storage/storage.service');
 const { success, paginated, created } = require('../utils/response');
 const { getPagination } = require('../utils/pagination');
 const { AppError } = require('../middleware/error');
@@ -31,11 +33,16 @@ async function upload(req, res, next) {
     if (!req.file) throw new AppError('No file uploaded');
     const file = req.file;
 
-    // Generate thumbnails (parallel with EXIF)
-    const [thumbResult, exifData] = await Promise.all([
+    // Generate thumbnails + upload original (parallel with EXIF)
+    const origBuf = await fs.readFile(file.path);
+    const [thumbResult, exifData, storageKey] = await Promise.all([
       thumbnailService.generate(file.path, file.filename),
       exifService.extract(file.path),
+      storage.upload(origBuf, `photos/${file.filename}`, file.mimetype),
     ]);
+
+    // Remove temp file uploaded by multer (already stored via storage service)
+    fs.unlink(file.path).catch(() => {});
 
     const { thumbnailKey, mediumKey, width, height } = thumbResult;
 
@@ -48,7 +55,7 @@ async function upload(req, res, next) {
       memory_id: req.body.memory_id || null,
       filename: file.filename,
       original_filename: file.originalname,
-      storage_key: `photos/${file.filename}`,
+      storage_key: storageKey,
       thumbnail_key: thumbnailKey,
       medium_key: mediumKey,
       file_size: file.size,
