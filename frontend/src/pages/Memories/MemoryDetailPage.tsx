@@ -204,8 +204,7 @@ export default function MemoryDetailPage() {
             <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="mb-5 card border border-dashed border-primary-300 dark:border-primary-800">
               <DropzoneUpload
                 memoryId={id}
-                onAllDone={() => {
-                  setUploadOpen(false)
+                onUploaded={() => {
                   qc.invalidateQueries({ queryKey: ['memory-photos', id] })
                   qc.invalidateQueries({ queryKey: ['memory', id] })
                 }}

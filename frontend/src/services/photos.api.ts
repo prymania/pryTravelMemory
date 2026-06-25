@@ -16,16 +16,8 @@ export const photosApi = {
   get: (id: string) =>
     get<Photo>(`/photos/${id}`),
 
-  upload: async (file: File, memoryId?: string, sortOrder?: number) => {
-    const fd = new FormData()
-    fd.append('photo', file)
-    if (memoryId)   fd.append('memory_id',   memoryId)
-    if (sortOrder != null) fd.append('sort_order', String(sortOrder))
-    const { data } = await api.post('/photos/upload', fd, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
-    return data.data as Photo & { exif_summary?: { has_gps: boolean; camera: string | null; taken_at: string | null } }
-  },
+  uploadMeta: (meta: Record<string, unknown>) =>
+    api.post('/photos/upload', meta).then(r => r.data.data as Photo),
 
   update: (id: string, data: Partial<Photo>) =>
     put<Photo>(`/photos/${id}`, data),

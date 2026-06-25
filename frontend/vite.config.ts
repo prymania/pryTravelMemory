@@ -26,6 +26,7 @@ export default defineConfig({
           'query':          ['@tanstack/react-query'],
           'motion':         ['framer-motion'],
           'leaflet':        ['leaflet', 'react-leaflet', 'react-leaflet-cluster'],
+          'supabase':       ['@supabase/supabase-js'],
           'lightbox':       ['yet-another-react-lightbox'],
           'date':           ['date-fns'],
           'icons':          ['lucide-react'],

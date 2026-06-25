@@ -1,8 +1,4 @@
-const fs = require('fs').promises;
 const photoModel = require('../models/photo.model');
-const exifService = require('../services/exif/exif.service');
-const thumbnailService = require('../services/image/thumbnail.service');
-const storage = require('../services/storage/storage.service');
 const { success, paginated, created } = require('../utils/response');
 const { getPagination } = require('../utils/pagination');
 const { AppError } = require('../middleware/error');
@@ -28,75 +24,63 @@ async function get(req, res, next) {
   } catch (e) { next(e); }
 }
 
+// Frontend uploads directly to Supabase Storage, then POSTs metadata here
 async function upload(req, res, next) {
   try {
-    if (!req.file) throw new AppError('No file uploaded');
-    const file = req.file;
+    const {
+      memory_id, original_filename, storage_key, thumbnail_key, medium_key,
+      file_size, mime_type, width, height, sort_order,
+      latitude, longitude, altitude, taken_at, exif_data,
+    } = req.body;
 
-    // Generate thumbnails + upload original (parallel with EXIF)
-    const origBuf = await fs.readFile(file.path);
-    const [thumbResult, exifData, storageKey] = await Promise.all([
-      thumbnailService.generate(file.path, file.filename),
-      exifService.extract(file.path),
-      storage.upload(origBuf, `photos/${file.filename}`, file.mimetype),
-    ]);
-
-    // Remove temp file uploaded by multer (already stored via storage service)
-    fs.unlink(file.path).catch(() => {});
-
-    const { thumbnailKey, mediumKey, width, height } = thumbResult;
-
-    // Parse GPS from EXIF
-    const lat = exifData.latitude || exifData.GPSLatitude || null;
-    const lng = exifData.longitude || exifData.GPSLongitude || null;
-    const takenAt = exifData.DateTimeOriginal || exifData.CreateDate || null;
+    if (!storage_key) throw new AppError('storage_key required', 400);
 
     const photo = await photoModel.createSimple(req.user.id, {
-      memory_id: req.body.memory_id || null,
-      filename: file.filename,
-      original_filename: file.originalname,
-      storage_key: storageKey,
-      thumbnail_key: thumbnailKey,
-      medium_key: mediumKey,
-      file_size: file.size,
-      mime_type: file.mimetype,
-      width,
-      height,
-      sort_order: parseInt(req.body.sort_order) || 0,
-      latitude: lat,
-      longitude: lng,
-      altitude: exifData.GPSAltitude || null,
-      taken_at: takenAt,
-      exif_data: exifData,
+      memory_id:         memory_id         || null,
+      filename:          storage_key.split('/').pop() || storage_key,
+      original_filename: original_filename  || 'photo',
+      storage_key,
+      thumbnail_key:     thumbnail_key      || storage_key,
+      medium_key:        medium_key         || storage_key,
+      file_size:         parseInt(file_size)  || 0,
+      mime_type:         mime_type           || 'image/webp',
+      width:             parseInt(width)     || 0,
+      height:            parseInt(height)    || 0,
+      sort_order:        parseInt(sort_order) || 0,
+      latitude:          latitude             || null,
+      longitude:         longitude            || null,
+      altitude:          altitude             || null,
+      taken_at:          taken_at             || null,
+      exif_data:         exif_data            || null,
     });
 
-    // Save EXIF detail table
-    if (exifData.Make || exifData.Model) {
+    if (exif_data?.Make || exif_data?.Model) {
+      const e = exif_data;
       await photoModel.saveExif(photo.id, {
-        camera_make: exifData.Make,
-        camera_model: exifData.Model,
-        lens_model: exifData.LensModel,
-        focal_length: exifData.FocalLength,
-        focal_length_35mm: exifData.FocalLengthIn35mmFormat,
-        aperture: exifData.FNumber,
-        iso: exifData.ISO,
-        shutter_speed: exifData.ExposureTime
-          ? (exifData.ExposureTime < 1 ? `1/${Math.round(1 / exifData.ExposureTime)}` : `${exifData.ExposureTime}s`)
+        camera_make:      e.Make,
+        camera_model:     e.Model,
+        lens_model:       e.LensModel,
+        focal_length:     e.FocalLength,
+        focal_length_35mm:e.FocalLengthIn35mmFormat,
+        aperture:         e.FNumber,
+        iso:              e.ISO,
+        shutter_speed:    e.ExposureTime
+          ? (e.ExposureTime < 1 ? `1/${Math.round(1 / e.ExposureTime)}` : `${e.ExposureTime}s`)
           : null,
-        exposure_bias: exifData.ExposureCompensation,
-        flash: String(exifData.Flash ?? ''),
-        white_balance: String(exifData.WhiteBalance ?? ''),
-        orientation: exifData.Orientation,
-        software: exifData.Software,
+        exposure_bias:    e.ExposureCompensation,
+        flash:            String(e.Flash ?? ''),
+        white_balance:    String(e.WhiteBalance ?? ''),
+        orientation:      e.Orientation,
+        software:         e.Software,
       });
     }
 
     created(res, {
       ...photo,
       exif_summary: {
-        has_gps: lat != null && lng != null,
-        camera: exifData.Model ? `${exifData.Make || ''} ${exifData.Model}`.trim() : null,
-        taken_at: takenAt,
+        has_gps: latitude != null && longitude != null,
+        camera:  exif_data?.Model ? `${exif_data.Make || ''} ${exif_data.Model}`.trim() : null,
+        taken_at,
       },
     });
   } catch (e) { next(e); }
